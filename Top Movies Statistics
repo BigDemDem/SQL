@@ -1,0 +1,36 @@
+# In this SQL, I am querying a database with multiple tables in it to quantify statistics about top rated movies. 
+
+
+SELECT * FROM topmovies;
+
+SELECT ROUND(AVG(Worldwide)) as Average_World_Rating FROM topmovies;
+
+SELECT rank, title, domestic FROM topmovies
+  GROUP BY domestic
+  HAVING domestic >500;
+    
+SELECT title, domesticpct, 
+    CASE
+        WHEN domesticpct >= .5 THEN "high_rating"
+        WHEN domesticpct < .5 THEN "low_rating"
+        ELSE "no rating"
+END as "domestic rating"
+FROM topmovies;
+
+SELECT title, domesticpct, overseaspct FROM topmovies 
+    WHERE domesticpct >= 0.50
+     AND overseaspct >= 0.50;
+     
+
+SELECT title, domesticpct, overseaspct FROM topmovies
+    WHERE domesticpct >= .5
+    OR overseaspct >= .8;
+    
+SELECT studio, ROUND(AVG(worldwide)) FROM topmovies;
+SELECT studio, MAX(domestic) FROM topmovies;
+    
+SELECT rank, title, year FROM topmovies
+GROUP BY rank
+HAVING rank <= 10;
+
+
