@@ -1,0 +1,120 @@
+**FedEx Outstanding Core Report**
+
+select a.ctacc, b.cmname, a.ctlncd, a.ctpart, a.ctqty, a.ctpric, a.ctbra2, a.ctinv, a.ctdtcr, a.ctretp, a.ctrqty, a.ctrefb, a.ctrefi, substr(c.mnonot,32,10) as emp#, d.mpides, e.mhporf from dstdata.ccctrak a
+	left join dstdata.arcust b on a.ctacc=b.cmacc
+	left join dstdata.oehmno c on a.ctbra2=c.mhbran and a.ctinv=c.mhinv and a.ctdtcr=c.mhidat and c.mnolin=1 and c.mpline=0
+	left join dstdata.oehmpt d on a.ctbra2=d.mhbran and a.ctinv=d.mhinv and a.ctdtcr=d.mhidat and d.mhind='I' and a.ctpart=d.mpsprt and a.ctlncd=d.mpslc
+	left join dstdata.oehmh e on a.ctbra2=e.mhbran and a.ctinv=e.mhinv and e.mhind='I' and a.ctacc=e.mhcacc and a.ctdtcr=e.mhidat
+	where b.cmdws='FE' and a.ctdtcr>20211231  and a.ctqty>a.ctrqty
+
+** Export Invoices **
+
+select b.mhporf, b.mhbran, b.mhidat, b.mhind, b.mhinv, a.mhcacc, b.MHCNAM,a.mpline, a.mpslc||a.mpsprt, 'x'||a.mpsprt, a.mpslc, c.name,
+        a.mpsprt, a.mpides, d.ssuper as SSTo, d.sprev as SSFrom, a.mpsqty qtysold, b.mhnegi, a.mpntpr as Price, a.mpicos as cost, max(e.value)
+    from dstdata.oehmpt a
+    left join dstdata.oehmh b
+      on a.mhbran=b.mhbran and a.mhind=b.mhind and a.mhinv=b.mhinv and a.mhcacc=b.mhcacc and a.mhidat=b.mhidat and a.mporrf=b.mhord#
+    left join dstdata.custline c on a.mpslc=c.line
+    left join dstdata.insmfh d on a.mpslc=d.sfran and a.mpsprt=d.spart
+    left join howard2.cootest e on a.mpslc=e.sfran and a.mpsprt=e.spart and 'COO'=e.type
+    where b.mhidat between 20230717 and 20230717 and a.mhbran=315 and b.mhcacc= 315065
+    group by b.mhporf, b.mhbran, b.mhidat, b.mhind, b.mhinv, a.mhcacc, b.MHCNAM,a.mpline, a.mpslc||a.mpsprt, 'x'||a.mpsprt, a.mpslc, c.name,
+        a.mpsprt, a.mpides, d.ssuper, d.sprev, a.mpsqty, b.mhnegi, a.mpntpr, a.mpicos
+
+
+** Weekly A6 Matrix**
+
+select a.mhcacc, c.cmname, a.mhbran, a.mhinv, a.mhidat, b.mhporf, a.mpslc, a.mpsprt, a.mpides, (b.mhnegi*a.mpsqty) as Qty, a.mpntpr, (b.mhnegi*a.mpsqty*a.mpntpr) as extprice, a.mpicor, (b.mhnegi*a.mpsqty*a.mpicor) as extcore, d.tracknum, d.shipdate from dstdata.oehmpt a
+	left join dstdata.oehmh b on a.mhbran=b.mhbran and a.mhind=b.mhind and a.mhinv=b.mhinv and a.mhcacc=b.mhcacc and a.mhidat=b.mhidat
+	left join dstdata.arcust c on a.mhcacc=c.cmacc
+	left join paicust.tracking d on a.mhbran=d.branch and b.mhord#=d.orderno and a.mhcacc=d.custnum and a.mhidat=d.shipdate
+	where c.cmdcat='A6' and a.mhidat between 20230711 and 20230717
+
+** Rolling 12 month sales by account **
+
+select c.cmacc, c.cmname, sum(case when (left(a.mhporf,3)<>'CNV' and a.mhidat between 20230601 and 20230630 ) then a.mhnegi*a.mhmchv else 0 end) as NonConSales,
+	sum(case when a.mhidat between 20230601 and 20230630  then a.mhnegi*a.mhmchv else 0 end) as Sales
+		from dstdata.arcust c
+	left join dstdata.oehmh a on a.mhcacc=c.cmacc
+	where c.cmacc not between  99000 and 99999 and a.mhidat between 20230601 and 20230630
+	group by c.cmacc, c.cmname
+
+
+*** Commodity Promo Tracking ***
+
+select a.cmacc, a.cmname, b.axpbrn, a.cmrep, c.saname, d.fltcode, e.mhinv, e.mhidat, e.mhbran, e.mpslc, e.mpsprt, g.sdescs, g.sdescl, g.sprod, (f.mhnegi*e.mpsqty) as qty, (f.mhnegi*e.mpsqty*e.mpntpr),
+    (f.mhnegi*(f.mhmchv+f.mhcorv+f.mhtaxv+f.mhfrtv+f.mhmisv+f.mhbldv+f.mhhndv)) as invttl, e.mhind, f.mhporf, f.mhslsa from dstdata.arcust a
+    left join dstdata.arcaux b on a.cmacc=b.axacc
+    left join dstdata.saslpn c on a.cmrep=c.saslcd
+    left join paicust.tagcustdl d on a.cmacc=d.cmacc and d.tagcode='CHANNEL'
+    left join dstdata.oehmpt e on a.cmacc=e.mhcacc
+    left join dstdata.oehmh f on e.mhbran=f.mhbran and e.mhind=f.mhind and e.mhinv=f.mhinv and e.mhidat=f.mhidat and e.mhcacc=f.mhcacc
+    left join dstdata.insmfh g on e.mpslc=g.sfran and e.mpsprt=g.spart
+    where e.mhidat between 20220918 and 20221016
+        and ((g.sfran = 'LM') or (g.sfran = 'VA') or (g.sfran = 'JO') or (g.sfran = '8C') or (g.sfran = 'AE') or (g.sfran = 'MK'))
+
+
+** Customer data for specific branch ***
+
+select b.axpbrn,a.cmacc, b.axddlc, a.cmname, a.cmadd1, a.cmadd2, a.cmadd3,  a.cmcity, a.cmstate, a.cmpost, a.cmrep, a.cmdcat
+from dstdata.arcust a
+left join dstdata.arcaux b on a.cmacc=b.axacc
+where b.axpbrn in (5, 30, 73, 75)
+
+** AR Transaction history by customer/ date ***
+
+select a.aracc, b.cmname, a.artdat, a.ardoc, a.arttyp,  a.arsref, a.argbal, a.argaos, a.arage, a.arsrc, a.arpost, a.artax, b.cmterm  from dstdata.arslhis a
+	join dstdata.arcust b on a.aracc=b.cmacc
+	where a.aracc in (92647    ) and a.artdat between 20190101 and 20230717
+union all
+select a.aracc, b.cmname, a.artdat, a.ardoc, a.arttyp,  a.arsref, a.argbal, a.argaos, a.arage, a.arsrc, a.arpost, a.artax, b.cmterm  from dstdata.arsledg a
+	join dstdata.arcust b on a.aracc=b.cmacc
+	where a.aracc in (92647   ) and a.artdat between 20190101 and 20230717
+
+
+
+** Monthly sales by Delivery Code with Matrix***
+
+Select b.axpbrn,a.cmacc, a.cmname, a.cmadd1, a.cmadd2, a.cmadd3,  a.cmcity, a.cmstate, a.cmpost,
+    sum(case when e.mhidat between 20230101 and 20230131 then (e.mhnegi*e.mhmchv) else 0 end) as Jansales,
+    sum(case when e.mhidat between 20230201 and 20230228 then (e.mhnegi*e.mhmchv) else 0 end) as Febsales,
+    sum(case when e.mhidat between 20230301 and 20230331 then (e.mhnegi*e.mhmchv) else 0 end) as Marsales,
+    sum(case when e.mhidat between 20230401 and 20230430 then (e.mhnegi*e.mhmchv) else 0 end) as Aprsales,
+    sum(case when e.mhidat between 20220101 and 20221231 then (e.mhnegi*e.mhmchv) else 0 end) as lastyrsales
+From dstdata.arcust a
+    Left join dstdata.oehmh e on a.cmacc=e.mhcacc
+    Left join dstdata.arcaux b on b.axacc=a.cmacc
+    where e.MHDVCD = 'RT2' and b.axpbrn = '340'
+    group by b.axpbrn,a.cmacc, a.cmname, a.cmadd1, a.cmadd2, a.cmadd3,  a.cmcity, a.cmstate, a.cmpost,e.MHCDCD
+
+
+** List of Accounts by ASM code and Sales Rep by Month ***
+
+Select e.cmacc, e.cmname, f.fltcode, h.FLTDESC,  g.fltcode, i.FLTDESC, e.cmrep, c.saname,
+  sum(case when b.mhidat between 20230101 and 20230131 then (b.mhnegi*b.mhmchv) else 0 end) as Jansales,
+    sum(case when b.mhidat between 20230201 and 20230228 then (b.mhnegi*b.mhmchv) else 0 end) as Febsales,
+    sum(case when b.mhidat between 20230301 and 20230331 then (b.mhnegi*b.mhmchv) else 0 end) as Marsales,
+    sum(case when b.mhidat between 20230401 and 20230430 then (b.mhnegi*b.mhmchv) else 0 end) as Aprsales,
+    sum(case when b.mhidat between 20230501 and 20230531 then (b.mhnegi*b.mhmchv) else 0 end) as Maysales,
+    sum(case when b.mhidat between 20230601 and 20230630 then (b.mhnegi*b.mhmchv) else 0 end) as Junsales,
+    sum(case when b.mhidat between 20230701 and 20230711 then (b.mhnegi*b.mhmchv) else 0 end) as Julsales
+from dstdata.oehmpt a
+Left Join dstdata.oehmh b on a.mhbran=b.mhbran and a.mhind=b.mhind and a.mhinv=b.mhinv and a.mhcacc=b.mhcacc and a.mhidat=b.mhidat
+Left Join dstdata.arcust e on e.cmacc=b.mhcacc
+Left Join paicust.tagcustdl f on a.mhcacc=f.cmacc and f.tagcode = 'CHANNEL'
+Left Join paicust.tagcustdl g on a.mhcacc=g.cmacc and g.tagcode='ASMCODE'
+Left Join paicust.tagcusth h on f.fltcode=h.fltcode and f.tagcode = 'CHANNEL'
+Left Join paicust.tagcusth i on g.fltcode=i.fltcode and g.tagcode = 'ASMCODE'
+left join dstdata.saslpn c on e.cmrep=c.saslcd
+Where e.cmrep in ('MJ','MF')
+Group By e.cmacc, e.cmname, f.fltcode, h.FLTDESC,  g.fltcode, i.FLTDESC, e.cmrep, c.saname
+
+
+
+
+
+
+
+
+
+
